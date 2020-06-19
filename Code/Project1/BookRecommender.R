@@ -6,73 +6,92 @@ library(plyr)
 library(dplyr)
 #Importing Data sets
 
-BookRatings <- read.csv("~/Documents/BigDataAnalytics2/Course 2 - 1040/Project1/Data/BX-Book-Ratings.csv", stringsAsFactors = FALSE, sep=";")
+BookRatings <- read.csv("~/Documents/BigDataAnalytics2/Course 2 - 1040/Project1/Data/BX-Book-Ratings.csv", stringsAsFactors = FALSE,
+                        strip.white = TRUE, quote="", sep=';')
 
 View(BookRatings)
 
-Books <- read.csv("~/Documents/BigDataAnalytics2/Course 2 - 1040/Project1/Data/BX-Books.csv", stringsAsFactors = FALSE, sep=";")
+Books <- read.csv("~/Documents/BigDataAnalytics2/Course 2 - 1040/Project1/Data/BX-Books.csv", stringsAsFactors = FALSE,
+                  strip.white = TRUE, quote="", sep=';')
 
 View(Books)
 
-Users <- read.csv2("~/Documents/BigDataAnalytics2/Course 2 - 1040/Project1/Data/BX-Users.csv", stringsAsFactors = FALSE)
+Users <- read.csv2("~/Documents/BigDataAnalytics2/Course 2 - 1040/Project1/Data/BX-Users.csv", stringsAsFactors = FALSE,
+                   strip.white = TRUE, quote="", sep=';')
 
 View(Users)
 
-BookRatingsISBN <- merge(BookRatings, Books, by.x = "ISBN", by.y = "ISBN")
+BookRatingsISBN <- merge(BookRatings, Books, by.x = "X.ISBN.", by.y = "X.ISBN.")
 
 View(BookRatingsISBN)
 
 #Merged dataset
-BookRatingsISBNUser <- merge(BookRatingsISBN, Users, by.x = "User.ID", by.y = "User.ID")
+BookRatingsISBNUser <- merge(BookRatingsISBN, Users, by.x = "X.User.ID.", by.y = "X.User.ID.")
 
 View(BookRatingsISBNUser)
 
-sum(BookRatingsISBNUser$Age == "NULL")
+#Replace all " with blank
 
-hist(BookRatingsISBNUser$Book.Rating, col = "lightblue", border = "pink")
+BookRatingsISBNUser[] <- lapply(BookRatingsISBNUser, gsub, pattern='"', replacement='')
 
-BookRatingDF <- data.frame(BookRatingsISBNUser$User.ID, BookRatingsISBNUser$ISBN, BookRatingsISBNUser$Book.Rating)
+#Convert BOOK_RATING column to numeric
+BookRatingsISBNUser$X.User.ID. <- as.character(BookRatingsISBNUser$X.User.ID.)
+BookRatingsISBNUser$X.ISBN. <- as.character(BookRatingsISBNUser$X.ISBN.)
+BookRatingsISBNUser$X.Book.Rating. <- as.numeric(BookRatingsISBNUser$X.Book.Rating.)
 
-BookRatingDF2 <- rename(BookRatingDF, c("BookRatingsISBNUser.User.ID"="UserID", "BookRatingsISBNUser.ISBN"="ISBN", "BookRatingsISBNUser.Book.Rating"="BookRating"))
+hist(BookRatingsISBNUser$X.Book.Rating., col = "lightblue", border = "pink")
+
+BookRatingDF <- data.frame(BookRatingsISBNUser$X.User.ID., BookRatingsISBNUser$X.ISBN., BookRatingsISBNUser$X.Book.Rating.)
+
+BookRatingDF2 <- BookRatingDF %>% rename("UserID"="BookRatingsISBNUser.X.User.ID.", "ISBN"="BookRatingsISBNUser.X.ISBN.", "BookRating"="BookRatingsISBNUser.X.Book.Rating.")
 
 View(BookRatingDF2)
 
 str(BookRatingDF2)
 
+BookRatingDF2$UserID <- as.character(BookRatingDF2$UserID)
 BookRatingDF2$ISBN <- as.character(BookRatingDF2$ISBN)
 
 BookRatingDF3 <- BookRatingDF2[BookRatingDF2$BookRating > 0,]
 
 hist(BookRatingDF3$BookRating, col = "lightblue", border = "pink")
 
-summary(BookRatingDF4)
-
-BookRatingDF4[rowCounts(MovieLense) > 50, colCounts(MovieLense) > 100]
-
 ##Dedup
+BookRatingDFUserlist <- BookRatingDF3 %>% group_by(UserID,ISBN) %>% summarise(count=n()) %>% filter(count==1)
+
+##BookRatingDF3 %>% group_by(ISBN) %>%filter(n()>10)
+
+##BookRatingDF3[BookRatingDF3$ISBN=="0452264464"]
+
+##result <- filter(BookRatingDF3, ISBN == '002542730X')
+
+BookRatingDF3 <- merge(BookRatingDF3, BookRatingDFUserlist, by.x = c("ISBN","UserID"), by.y = c("ISBN","UserID"))
+
 BookRatingDF3 %>% group_by(UserID,ISBN) %>% summarise(count=n()) %>% filter(count>1)
-
-BookRatingDF3 %>% group_by(ISBN) %>%filter(n()>10)
-
-BookRatingDF3[BookRatingDF3$ISBN=="0452264464"]
-
-result <- filter(BookRatingDF3, ISBN == '002542730X')
 
 ## Book with atleast 10 users
 BookRatingISBNList <- BookRatingDF3 %>% group_by(ISBN) %>% summarise(count=n()) %>% filter(count>10)
 
 BookRatingDF4 <- merge(BookRatingDF3, BookRatingISBNList, by.x = "ISBN", by.y = "ISBN")
 
+#Users with atleast 10 ratings
+Userlist <- BookRatingDF4 %>% group_by(UserID) %>% summarise(count=n()) %>% filter(count>10)
+
+BookRatingDF40 <- merge(BookRatingDF4, Userlist, by.x = "UserID", by.y = "UserID")
+
 #BookRatingDF41=select(BookRatingDF4, -c(count))
 
-BookRatingDF41 <- data.frame(BookRatingDF4$UserID,BookRatingDF4$ISBN,BookRatingDF4$BookRating)
+BookRatingDF41 <- data.frame(BookRatingDF40$UserID,BookRatingDF40$ISBN,BookRatingDF40$BookRating)
 
 str(BookRatingDF41)
 
-BookRatingDF42 <- BookRatingDF41 %>% rename("UserID"="BookRatingDF4.UserID", "ISBN"="BookRatingDF4.ISBN", "BookRating"="BookRatingDF4.BookRating")
+BookRatingDF42 <- BookRatingDF41 %>% rename("UserID"="BookRatingDF40.UserID", "ISBN"="BookRatingDF40.ISBN", "BookRating"="BookRatingDF40.BookRating")
 
+BookRatingDF42$UserID <- as.character(BookRatingDF42$UserID)
 BookRatingDF42$ISBN <- as.character(BookRatingDF42$ISBN)
 str(BookRatingDF42)
+
+
 
 ##Matrix
 
@@ -94,7 +113,7 @@ BookRatingDF7
 # view BookRatingDF7 in other possible ways
 as(BookRatingDF7, "list") # A list
 as(BookRatingDF7, "matrix") # A sparse matrix
-  
+
 #Turn it into data-frame
 head(as(BookRatingDF7, "data.frame"))
 
@@ -119,36 +138,87 @@ BookRatingDF9 <- binarize(BookRatingDF7, minRating=1)
 as(BookRatingDF9, "matrix")
 
 
-# Create a recommender object (model)
-#?? Run anyone of the following four code lines.
-#???? Do not run all four
-#?????? They pertain to four different algorithms.
-#??????? UBCF: User-based collaborative filtering
-#??????? IBCF: Item-based collaborative filtering
-#????? Parameter 'method' decides similarity measure
-#??????? Cosine or Jaccard
-rec=Recommender(BookRatingDF7[1:nrow(BookRatingDF7)],method="UBCF", param=list(normalize = "Z-score",method="Cosine",nn=5, minRating=1))
-#rec=Recommender(r[1:nrow(r)],method="UBCF", param=list(normalize = "Z-score",method="Jaccard",nn=5, minRating=1))
-#rec=Recommender(r[1:nrow(r)],method="IBCF", param=list(normalize = "Z-score",method="Jaccard",minRating=1))
-#rec=Recommender(r[1:nrow(r)],method="POPULAR")
+#Restrict dataset to users who have rated at least 5 books and books that have been rated by at least 20 users
+
+ratings = BookRatingDF7[rowCounts(BookRatingDF7) > 15, colCounts(BookRatingDF7) > 50]
+dim(ratings)
+
+image(ratings, main = "Raw Ratings")
+
+#Normalize ratings
+
+ratings.n = normalize(ratings)
+ratings.n.vec = as.vector(ratings.n@data)
+ratings.n.vec = ratings.n.vec[ratings.n.vec != 0]
+hist(ratings.n.vec, main="Histogram of Normalized Ratings", xlab="Rating")
+
+#Split the dataset into train and test
+
+percent_train = 0.8
+#min(rowCounts(ratings.n))
+items_to_keep = 10        # items to use for each user
+rating_threshold = 7      # good rating implies >=3
+n_eval = 1                # number of times to run eval
+
+eval_sets = evaluationScheme(data = BookRatingDF7, method = "split",
+                             train = percent_train, given = items_to_keep,
+                             goodRating = rating_threshold, k = n_eval)
+
+eval_sets
+
+##UBCF
+
+eval_recommender = Recommender(data = getData(eval_sets, "train"),
+                               method = "UBCF", parameter = NULL)
+items_to_recommend = 5
+
+eval_prediction = predict(object = eval_recommender,
+                          newdata = getData(eval_sets, "known"),
+                          n = items_to_recommend,
+                          type = "ratings")
+
+eval_accuracy = calcPredictionAccuracy(x = eval_prediction,
+                                       data = getData(eval_sets, "unknown"),
+                                       byUser = TRUE)
+head(eval_accuracy)
+
+##################IBCF
+
+eval_recommender_IBCF = Recommender(data = getData(eval_sets, "train"),
+                               method = "IBCF", parameter = NULL)
+items_to_recommend_IBCF = 5
+eval_prediction_IBCF = predict(object = eval_recommender_IBCF,
+                          newdata = getData(eval_sets, "known"),
+                          n = items_to_recommend_IBCF,
+                          type = "ratings")
+eval_accuracy_IBCF = calcPredictionAccuracy(x = eval_prediction_IBCF,
+                                       data = getData(eval_sets, "unknown"),
+                                       byUser = TRUE)
+head(eval_accuracy_IBCF)
 
 
-# Depending upon your selection, examine what you got
-print(rec)
-names(getModel(rec))
-getModel(rec)$nn
+##################
+
+models_to_evaluate = list(UBCF_cos = list(name = "UBCF", param = list(method = "cosine")),
+                          UBCF_cor = list(name = "UBCF", param = list(method = "pearson")),
+                          random = list(name = "RANDOM", param=NULL))
 
 
-############Create predictions#############################
-# This prediction does not predict movie ratings for test.
-#?? But it fills up the user 'X' item matrix so that
-#??? for any userid and movieid, I can find predicted rating
-#???? dim(r) shows there are 6040 users (rows)
-#????? 'type' parameter decides whether you want ratings or top-n items
-#???????? get top-10 recommendations for a user, as:
-#???????????? predict(rec, r[1:nrow(r)], type="topNList", n=10)
-recom <- predict(rec, BookRatingDF7[1:nrow(BookRatingDF7)], type="ratings")
-recom
+models_to_evaluate = list(IBCF_cos = list(name = "IBCF", param = list(method = "cosine")),
+                          IBCF_cor = list(name = "IBCF", param = list(method = "pearson")),
+                          UBCF_cos = list(name = "UBCF", param = list(method = "cosine")),
+                          UBCF_cor = list(name = "UBCF", param = list(method = "pearson")),
+                          random = list(name = "RANDOM", param=NULL))
 
+n_recommendations = c(1, 3, 5, 10, 15, 20)
+results = evaluate(x = eval_sets, method = models_to_evaluate, n = n_recommendations)
 
+# Draw ROC curve
+plot(results, y = "ROC", annotate = 1, legend="topleft")
+title("ROC Curve")
 
+# Draw precision / recall curve
+plot(results, y = "prec/rec", annotate=1)
+title("Precision-Recall")
+
+##############################end#####################
