@@ -105,7 +105,23 @@ as(BookRatingDF9, "matrix")
 ratings = BookRatingDF7[rowCounts(BookRatingDF7) > 15, colCounts(BookRatingDF7) > 50]
 dim(ratings)
 
-image(ratings, main = "Raw Ratings")
+image(ratings, main = "Filtered Ratings", asp=1.5)
+
+longData<-melt(BookRatingDF6)
+longData<-longData[!is.na(longData$value),]
+
+longData <- longData %>% rename("UserID"="Var1", "ISBN"="Var2", "BookRating"="value")
+
+Viz1 <- longData %>% group_by(BookRating) %>% summarise(count=n())
+
+ggplot(Viz1, aes(x=BookRating, y=count, fill=BookRating)) +
+  geom_bar(stat="identity") + theme_minimal()
+
+Viz2 <- longData %>% group_by(UserID) %>% summarise(count=n()) %>% filter(count<500)
+
+
+ggplot(Viz2,aes(x=UserID,y=count))+geom_point()
+
 
 #Split the dataset into train and test
 
@@ -167,11 +183,6 @@ n_recommendations = c(1, 3, 5, 10, 15, 20)
 
 results = evaluate(x = eval_sets, method = models_to_evaluate, n = n_recommendations)
 
-eval_recommender = Recommender(data = getData(eval_sets, "train"),
-                               method = "UBCF", parameter = list(method = "cosine"))
-
-save(eval_recommender,file='BookRecommender.rds')
-
 # Draw ROC curve
 plot(results, y = "ROC", annotate = 1, legend="topleft")
 title("ROC Curve")
@@ -179,6 +190,23 @@ title("ROC Curve")
 # Draw precision / recall curve
 plot(results, y = "prec/rec", annotate=1)
 title("Precision-Recall")
+
+
+#UBCF with cosine
+
+eval_recommender = Recommender(data = getData(eval_sets, "train"),
+                               method = "UBCF", parameter = list(method = "cosine"))
+
+items_to_recommend_IBCF = 10
+eval_prediction = predict(object = eval_recommender,
+                               newdata = getData(eval_sets, "known"),
+                               n = items_to_recommend_IBCF,
+                               type = "ratings")
+
+eval_accuracy = calcPredictionAccuracy(x = eval_prediction,
+                                            data = getData(eval_sets, "unknown"),
+                                            byUser = TRUE)
+head(eval_accuracy)
 
 ###########################
 
